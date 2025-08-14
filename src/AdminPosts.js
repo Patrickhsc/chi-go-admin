@@ -40,7 +40,7 @@ export default function AdminPosts() {
     }));
   };
 
-  // 保存编辑（优先 /admin/posts/:id；若 adminAPI.updatePost 不存在则回退到 /api/posts/:id）
+  // 保存编辑（优先 /admin/posts/:id；否则回退 /api/posts/:id）
   const saveEdit = async (e) => {
     e.preventDefault();
     try {
@@ -55,13 +55,12 @@ export default function AdminPosts() {
 
       const doUpdate =
         typeof adminAPI.updatePost === "function"
-          ? adminAPI.updatePost // 你若在 api.js 里补了这个则优先用 /admin/posts/:id
-          : communityAPI.updatePost; // 否则使用公共接口 /api/posts/:id
+          ? adminAPI.updatePost
+          : communityAPI.updatePost;
 
       const res = await doUpdate(id, payload);
       const updated = res.data || payload;
 
-      // 本地更新
       setPosts((prev) =>
         prev.map((p) => (getId(p) === id ? { ...p, ...updated } : p))
       );
@@ -72,7 +71,6 @@ export default function AdminPosts() {
     }
   };
 
-  // 取消编辑
   const cancelEdit = () => setEditingPost(null);
 
   // 删除（DELETE /admin/posts/:id）
@@ -117,7 +115,6 @@ export default function AdminPosts() {
                     placeholder="Description"
                     required
                   />
-                  {/* is_public 仅展示或按需编辑；这里保留开关（可选） */}
                   <label style={{ marginLeft: 8 }}>
                     Public:&nbsp;
                     <input
@@ -168,7 +165,9 @@ export default function AdminPosts() {
                       </>
                     )}
                     {post.updated_at && (
-                      <strong>Updated:</strong> {post.updated_at}
+                      <>
+                        <strong>Updated:</strong> {post.updated_at}
+                      </>
                     )}
                   </div>
                   <div className="actions">
