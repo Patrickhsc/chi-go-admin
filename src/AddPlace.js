@@ -15,63 +15,61 @@ export default function AddPlace() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (submitting) return;
+  setSubmitting(true);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (submitting) return;
-    setSubmitting(true);
-
-    try {
-      // 规范化/校验
-      const lat = parseFloat(form.location_lat);
-      const lng = parseFloat(form.location_lng);
-      if (Number.isNaN(lat) || Number.isNaN(lng)) {
-        alert("Latitude/Longitude must be valid numbers.");
-        setSubmitting(false);
-        return;
-      }
-
-      const payload = {
-        name: form.name,
-        description: form.description,
-        image: form.image || undefined,
-        location_lat: lat,
-        location_lng: lng,
-        location_address: form.location_address,
-        is_active: true, // 如需默认激活，可按需调整
-      };
-
-      // 按分类走不同的 admin 接口
-      if (form.category === "Attraction") {
-        await adminAPI.createAttraction(payload); // POST /admin/attractions
-      } else if (form.category === "Restaurant") {
-        await adminAPI.createRestaurant(payload); // POST /admin/restaurants
-      } else {
-        throw new Error("Unknown category: " + form.category);
-      }
-
-      alert("Place added successfully!");
-      // 清表单
-      setForm({
-        category: "Attraction",
-        name: "",
-        description: "",
-        image: "",
-        location_lat: "",
-        location_lng: "",
-        location_address: "",
-      });
-    } catch (err) {
-      console.error("Error adding place:", err?.response || err);
-      alert(err?.response?.data?.message || err.message || "Add failed");
-    } finally {
+  try {
+    // 规范化/校验
+    const lat = parseFloat(form.location_lat);
+    const lng = parseFloat(form.location_lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      alert("Latitude/Longitude must be valid numbers.");
       setSubmitting(false);
+      return;
     }
-  };
+
+    // 关键：location 做成对象，isActive 用驼峰
+    const payload = {
+      name: form.name,
+      description: form.description,
+      image: form.image || undefined,
+      location: {
+        lat,
+        lng,
+        address: form.location_address,
+      },
+      isActive: true, // 注意字段名
+    };
+
+    // 按分类走不同的 admin 接口
+    if (form.category === "Attraction") {
+      await adminAPI.createAttraction(payload); // POST /admin/attractions
+    } else if (form.category === "Restaurant") {
+      await adminAPI.createRestaurant(payload); // POST /admin/restaurants
+    } else {
+      throw new Error("Unknown category: " + form.category);
+    }
+
+    alert("Place added successfully!");
+    // 清表单
+    setForm({
+      category: "Attraction",
+      name: "",
+      description: "",
+      image: "",
+      location_lat: "",
+      location_lng: "",
+      location_address: "",
+    });
+  } catch (err) {
+    console.error("Error adding place:", err?.response || err);
+    alert(err?.response?.data?.message || err.message || "Add failed");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <div className="add-place-container">
