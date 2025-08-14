@@ -1,5 +1,7 @@
+// src/AddPlace.js
 import React, { useState } from "react";
 import "./AddPlace.css";
+import { adminAPI } from "./services/api"; // ✅ 使用封装好的后端客户端
 
 export default function AddPlace() {
   const [form, setForm] = useState({
@@ -11,44 +13,69 @@ export default function AddPlace() {
     location_lng: "",
     location_address: "",
   });
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Convert lat/lng to float
-    const payload = {
-      ...form,
-      location_lat: parseFloat(form.location_lat),
-      location_lng: parseFloat(form.location_lng),
-    };
-    fetch("/api/places", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        alert("Place added successfully!");
-        setForm({
-          category: "Attraction",
-          name: "",
-          description: "",
-          image: "",
-          location_lat: "",
-          location_lng: "",
-          location_address: "",
-        });
-      })
-      .catch((err) => console.error("Error adding place:", err));
+    if (submitting) return;
+    setSubmitting(true);
+
+    try {
+      // 规范化/校验
+      const lat = parseFloat(form.location_lat);
+      const lng = parseFloat(form.location_lng);
+      if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        alert("Latitude/Longitude must be valid numbers.");
+        setSubmitting(false);
+        return;
+      }
+
+      const payload = {
+        name: form.name,
+        description: form.description,
+        image: form.image || undefined,
+        location_lat: lat,
+        location_lng: lng,
+        location_address: form.location_address,
+        is_active: true, // 如需默认激活，可按需调整
+      };
+
+      // 按分类走不同的 admin 接口
+      if (form.category === "Attraction") {
+        await adminAPI.createAttraction(payload); // POST /admin/attractions
+      } else if (form.category === "Restaurant") {
+        await adminAPI.createRestaurant(payload); // POST /admin/restaurants
+      } else {
+        throw new Error("Unknown category: " + form.category);
+      }
+
+      alert("Place added successfully!");
+      // 清表单
+      setForm({
+        category: "Attraction",
+        name: "",
+        description: "",
+        image: "",
+        location_lat: "",
+        location_lng: "",
+        location_address: "",
+      });
+    } catch (err) {
+      console.error("Error adding place:", err?.response || err);
+      alert(err?.response?.data?.message || err.message || "Add failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="add-place-container">
-      <h2 className="form-title">Admin &middot; Add Attraction/Restaurant</h2>
+      <h2 className="form-title">Admin · Add Attraction/Restaurant</h2>
       <form onSubmit={handleSubmit} className="card add-place-form">
         <div className="form-group">
           <label>Category</label>
@@ -62,6 +89,7 @@ export default function AddPlace() {
             <option value="Restaurant">Restaurant</option>
           </select>
         </div>
+
         <div className="form-group">
           <label>Name</label>
           <input
@@ -73,6 +101,7 @@ export default function AddPlace() {
             className="form-input"
           />
         </div>
+
         <div className="form-group">
           <label>Description</label>
           <textarea
@@ -84,6 +113,7 @@ export default function AddPlace() {
             className="form-input"
           />
         </div>
+
         <div className="form-group">
           <label>Image URL</label>
           <input
@@ -94,6 +124,7 @@ export default function AddPlace() {
             className="form-input"
           />
         </div>
+
         <div className="form-group">
           <label>Latitude</label>
           <input
@@ -107,6 +138,7 @@ export default function AddPlace() {
             step="any"
           />
         </div>
+
         <div className="form-group">
           <label>Longitude</label>
           <input
@@ -120,6 +152,7 @@ export default function AddPlace() {
             step="any"
           />
         </div>
+
         <div className="form-group">
           <label>Address</label>
           <input
@@ -131,8 +164,9 @@ export default function AddPlace() {
             className="form-input"
           />
         </div>
-        <button type="submit" className="submit-btn">
-          Add Place
+
+        <button type="submit" className="submit-btn" disabled={submitting}>
+          {submitting ? "Adding..." : "Add Place"}
         </button>
       </form>
     </div>
