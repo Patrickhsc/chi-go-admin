@@ -1,65 +1,91 @@
 // src/services/api.js
 import axios from 'axios';
 
-/**
- * 后端基址：
- * - 优先 REACT_APP_API_BASE（推荐）
- * - 其次 REACT_APP_API_URL（与你之前的命名兼容）
- * - 都没配则为 ""，便于本地用 CRA proxy
- * 同时去掉尾部多余 "/"，避免出现双斜杠。
- */
+// ------- 统一读取 & 规范化基址 -------
 const RAW_BASE =
   process.env.REACT_APP_API_BASE ||
   process.env.REACT_APP_API_URL ||
   '';
-const API_BASE_URL = RAW_BASE.replace(/\/+$/, ''); // e.g. https://xxx.azurewebsites.net
+const API_BASE_URL = RAW_BASE.replace(/\/+$/, ''); // 去掉尾部 '/'
 
+// 小工具：拼路径，避免出现双斜杠
+const join = (a, b) =>
+  [String(a || '').replace(/\/+$/, ''), String(b || '').replace(/^\/+/, '')]
+    .filter(Boolean)
+    .join('/');
+
+console.log('[ADMIN] API_BASE =', API_BASE_URL);
+
+// ------- 通用 axios（不带前缀）-------
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,                // 若不用跨域 Cookie，可改为 false
+  baseURL: API_BASE_URL,          // 例如 https://xxx.azurewebsites.net
+  withCredentials: true,          // 不用 Cookie 可改为 false
   headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
 });
 
-// ========== 拦截器 ==========
+// 拦截器（带上本地 token、401 统一跳登录）
 api.interceptors.request.use(
   (config) => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (user.token) {
-      config.headers.Authorization = `Bearer ${user.token}`;
-    }
+    if (user.token) config.headers.Authorization = `Bearer ${user.token}`;
     return config;
   },
   (error) => Promise.reject(error)
 );
 
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 
-// ========== 健康检查 ==========
+// ------- 专用：/auth 子路径的 axios 实例 -------
+// 这样 Login 组件可以用 auth.post('/login') / auth.post('/register')
+export const auth = axios.create({
+  baseURL: join(API_BASE_URL, 'auth'),   // => https://.../auth
+  withCredentials: true,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000,
+});
+
+// 给 auth 实例也加上同样的拦截器（可选）
+auth.interceptors.request.use(
+  (config) => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.token) config.headers.Authorization = `Bearer ${user.token}`;
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+auth.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+// ------- 其它 API 分组（保持你现有写法）-------
 export const healthAPI = {
   ping: () => api.get('/healthz'),
 };
 
-// ========== Auth ==========
 export const authAPI = {
-  login:     (credentials) => api.post('/auth/login', credentials),
-  register:  (userData)    => api.post('/auth/register', userData),
-  logout:    ()            => api.post('/auth/logout'),
-  getProfile:()            => api.get('/auth/me'),
+  login:     (c) => api.post('/auth/login', c),
+  register:  (u) => api.post('/auth/register', u),
+  logout:    ()  => api.post('/auth/logout'),
+  getProfile:()  => api.get('/auth/me'),
 };
-// 兼容用法：import { auth } from './services/api'
-export const auth = authAPI;
 
-// ========== Attractions ==========
 export const attractionsAPI = {
   getAll:   ()        => api.get('/api/attractions'),
   getById:  (id)      => api.get(`/api/attractions/${id}`),
@@ -68,7 +94,6 @@ export const attractionsAPI = {
   delete:   (id)      => api.delete(`/api/attractions/${id}`),
 };
 
-// ========== Restaurants ==========
 export const restaurantsAPI = {
   getAll:   ()        => api.get('/api/restaurants'),
   getById:  (id)      => api.get(`/api/restaurants/${id}`),
@@ -77,18 +102,16 @@ export const restaurantsAPI = {
   delete:   (id)      => api.delete(`/api/restaurants/${id}`),
 };
 
-// ========== Checklist ==========
 export const checklistAPI = {
-  get:   (userId)                       => api.get(`/api/checklists/${userId}`),
-  add:   (userId, item)                 => api.post(`/api/checklists/${userId}/add`, item),
-  remove:(userId, itemId, itemType)     =>
+  get:   (userId)                   => api.get(`/api/checklists/${userId}`),
+  add:   (userId, item)             => api.post(`/api/checklists/${userId}/add`, item),
+  remove:(userId, itemId, itemType) =>
     api.delete(`/api/checklists/${userId}/remove`, {
       data: { itemId, itemType },
       headers: { 'Content-Type': 'application/json' },
     }),
 };
 
-// ========== Community ==========
 export const communityAPI = {
   getPosts:   ()        => api.get('/api/posts'),
   getPost:    (id)      => api.get(`/api/posts/${id}`),
@@ -97,23 +120,18 @@ export const communityAPI = {
   deletePost: (id)      => api.delete(`/api/posts/${id}`),
 };
 
-// ========== Admin ==========
 export const adminAPI = {
-  // Attractions
   createAttraction: (data)    => api.post('/admin/attractions', data),
   updateAttraction: (id,data) => api.put(`/admin/attractions/${id}`, data),
   deleteAttraction: (id)      => api.delete(`/admin/attractions/${id}`),
 
-  // Restaurants
   createRestaurant: (data)    => api.post('/admin/restaurants', data),
   updateRestaurant: (id,data) => api.put(`/admin/restaurants/${id}`, data),
   deleteRestaurant: (id)      => api.delete(`/admin/restaurants/${id}`),
 
-  // Posts
   getAllPosts: ()   => api.get('/admin/posts'),
   deletePost:  (id) => api.delete(`/admin/posts/${id}`),
 
-  // Users
   getAllUsers: ()   => api.get('/admin/users'),
   updateUser:  (id,data) => api.put(`/admin/users/${id}`, data),
   deleteUser:  (id) => api.delete(`/admin/users/${id}`),
