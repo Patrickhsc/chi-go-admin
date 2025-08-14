@@ -22,11 +22,13 @@ jobs:
       - name: Install deps
         run: npm install
 
+      - name: Show API base
+        run: echo "API_BASE_URL=${{ vars.API_BASE_URL }}"
+
       - name: Build app (CI=false) and inject API base
         run: npm run build
         env:
           CI: "false"
-          # 你的 api.js 同时兼容这两个变量名，二者都注入更稳
           REACT_APP_API_BASE: ${{ vars.API_BASE_URL }}
           REACT_APP_API_URL:  ${{ vars.API_BASE_URL }}
 
