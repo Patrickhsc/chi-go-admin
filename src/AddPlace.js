@@ -51,6 +51,8 @@ export default function AddPlace() {
         isActive: true, // 注意字段名
       };
 
+      console.log('提交的 payload:', payload);
+
       // 按分类走不同的 admin 接口
       if (form.category === "Attraction") {
         await adminAPI.createAttraction(payload); // POST /admin/attractions
