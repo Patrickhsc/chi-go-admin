@@ -1,4 +1,3 @@
-// src/AdminAnalytics.js
 import React, { useEffect, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import "chart.js/auto";
@@ -9,7 +8,7 @@ import api, {
   restaurantsAPI,
 } from "./services/api";
 
-// 安全计数
+// Utility: Safely count items from various API response structures
 const countOf = (data) => {
   if (!data) return 0;
   if (Array.isArray(data)) return data.length;
@@ -20,6 +19,24 @@ const countOf = (data) => {
   return 0;
 };
 
+// Color palette for bar charts
+const palette = [
+  "rgba(75,192,192,0.7)",
+  "rgba(255,99,132,0.7)",
+  "rgba(255,205,86,0.7)",
+  "rgba(54,162,235,0.7)",
+  "rgba(153,102,255,0.7)",
+  "rgba(201,203,207,0.7)",
+  "rgba(255,159,64,0.7)"
+];
+
+// Chart container style for unified width
+const chartContainerStyle = {
+  maxWidth: 600,
+  width: "100%",
+  margin: "0 auto",
+};
+
 export default function AdminAnalytics() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [attractions, setAttractions] = useState([]); // [{name, userCount}]
@@ -27,34 +44,45 @@ export default function AdminAnalytics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Helper for generating color arrays for bars
+  const getColors = (len) =>
+    Array(len)
+      .fill(0)
+      .map((_, i) => palette[i % palette.length]);
+
+  // Fetch analytics data on mount
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError("");
 
       try {
-        // 1) 优先尝试统一聚合接口：/admin/analytics
+        // 1. Try unified analytics API first
         try {
           const res = await api.get("/admin/analytics");
           const d = res.data || {};
           if (typeof d.users !== "undefined") setTotalUsers(countOf(d.users));
           if (Array.isArray(d.attractions))
-            setAttractions(d.attractions.map((x) => ({
-              name: x.name ?? x.title ?? "Unknown",
-              userCount: Number(x.userCount ?? x.count ?? 0),
-            })));
+            setAttractions(
+              d.attractions.map((x) => ({
+                name: x.name ?? x.title ?? "Unknown",
+                userCount: Number(x.userCount ?? x.count ?? 0),
+              }))
+            );
           if (Array.isArray(d.restaurants))
-            setRestaurants(d.restaurants.map((x) => ({
-              name: x.name ?? x.title ?? "Unknown",
-              userCount: Number(x.userCount ?? x.count ?? 0),
-            })));
+            setRestaurants(
+              d.restaurants.map((x) => ({
+                name: x.name ?? x.title ?? "Unknown",
+                userCount: Number(x.userCount ?? x.count ?? 0),
+              }))
+            );
           setLoading(false);
           return;
         } catch (_) {
-          // 没有该接口或 404/501，继续回退逻辑
+          // Fallback if API not found or fails
         }
 
-        // 2) 用户总数：先试 /api/users/count；失败则拉 /admin/users 计数
+        // 2. Get total users count (fallback)
         let usersCount = 0;
         try {
           const r = await api.get("/api/users/count");
@@ -69,7 +97,7 @@ export default function AdminAnalytics() {
         }
         setTotalUsers(usersCount);
 
-        // 3) 排行榜：先试 /api/places/rankings（期望 {attractions:[{name,userCount}], restaurants:[...] }）
+        // 3. Try to get rankings for attractions/restaurants
         let topAttr = [];
         let topRest = [];
         try {
@@ -88,20 +116,19 @@ export default function AdminAnalytics() {
             }));
           }
         } catch {
-          // 4) 再回退：没有排行榜接口就分别读取列表，给个“0”占位
-          // 你后端若在列表项里就带了使用人数字段（如 likes / checklistCount），可在这里改成读取对应字段
+          // 4. Fallback: get all and set userCount to 0 if not found
           try {
-            const a = await attractionsAPI.getAll(); // /api/attractions
+            const a = await attractionsAPI.getAll();
             const list = a.data || [];
             topAttr = list.map((x) => ({
               name: x.name ?? x.title ?? "Unknown",
-              userCount: Number(x.userCount ?? x.count ?? 0), // 没有就为 0
+              userCount: Number(x.userCount ?? x.count ?? 0),
             }));
           } catch {
             topAttr = [];
           }
           try {
-            const r = await restaurantsAPI.getAll(); // /api/restaurants
+            const r = await restaurantsAPI.getAll();
             const list = r.data || [];
             topRest = list.map((x) => ({
               name: x.name ?? x.title ?? "Unknown",
@@ -115,97 +142,179 @@ export default function AdminAnalytics() {
         setAttractions(topAttr);
         setRestaurants(topRest);
       } catch (e) {
+        // Set error message
         console.error("analytics error:", e?.response || e);
-        setError(e?.response?.data?.message || e.message || "Failed to load analytics data.");
+        setError(
+          e?.response?.data?.message || e.message || "Failed to load analytics data."
+        );
       } finally {
         setLoading(false);
       }
     };
 
     load();
+    // Only run on mount
+    // eslint-disable-next-line
   }, []);
 
-  // 准备图表数据
+  // Bar chart data for attractions
   const attractionData = {
     labels: attractions.map((a) => a.name),
     datasets: [
       {
         label: "Users",
         data: attractions.map((a) => a.userCount),
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
+        backgroundColor: getColors(attractions.length),
+        borderRadius: 8,
+        borderWidth: 1.5,
+        borderColor: "#fff",
+        hoverBackgroundColor: getColors(attractions.length).map((c) =>
+          c.replace(/0\.7/, "1")
+        ),
       },
     ],
   };
+
+  // Bar chart data for restaurants
   const restaurantData = {
     labels: restaurants.map((r) => r.name),
     datasets: [
       {
         label: "Users",
         data: restaurants.map((r) => r.userCount),
-        backgroundColor: "rgba(255, 99, 132, 0.6)",
+        backgroundColor: getColors(restaurants.length),
+        borderRadius: 8,
+        borderWidth: 1.5,
+        borderColor: "#fff",
+        hoverBackgroundColor: getColors(restaurants.length).map((c) =>
+          c.replace(/0\.7/, "1")
+        ),
       },
     ],
   };
 
+  // Unified chart options for both charts
   const chartOptions = {
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      title: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y || ctx.parsed}`,
+        },
+        backgroundColor: "rgba(0,0,0,0.8)",
+        titleFont: { weight: "bold" },
+      },
+    },
     scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 14 } },
+      },
       y: {
         beginAtZero: true,
         ticks: {
           stepSize: 1,
+          font: { size: 14 },
           callback: (v) => (Number.isInteger(v) ? v : null),
         },
+        grid: {
+          color: "#eee",
+          borderDash: [4, 4],
+        },
       },
+    },
+    animation: {
+      duration: 700,
+      easing: "easeOutQuart",
     },
   };
 
   return (
     <div className="container">
-      <h2>Admin · Analytics</h2>
+      <h2 style={{ textAlign: "center", margin: "2rem 0" }}>Admin · Analytics</h2>
 
       {loading && <div>Loading analytics...</div>}
       {!loading && error && <div style={{ color: "red" }}>{error}</div>}
 
       {!loading && !error && (
         <>
-          {/* Total Users */}
-          <div className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
+          {/* Total Users Card */}
+          <div
+            className="card"
+            style={{
+              marginBottom: "1rem",
+              padding: "1rem",
+              textAlign: "center",
+            }}
+          >
             <h3>Total Users</h3>
-            <p>{totalUsers}</p>
+            <p style={{ fontWeight: "bold", fontSize: 28 }}>{totalUsers}</p>
           </div>
 
-          {/* Top Attractions */}
+          {/* Top Attractions List (numbered, no dots) */}
           <div className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
             <h3>Top Attractions</h3>
-            <ul>
+            <div>
               {attractions.map((a, idx) => (
-                <li key={idx}>
+                <div
+                  key={idx}
+                  style={{
+                    marginBottom: 4,
+                    fontSize: 16,
+                  }}
+                >
                   {idx + 1}. {a.name} — Users: {a.userCount}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
-          {/* Top Restaurants */}
+          {/* Top Restaurants List (numbered, no dots) */}
           <div className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
             <h3>Top Restaurants</h3>
-            <ul>
+            <div>
               {restaurants.map((r, idx) => (
-                <li key={idx}>
+                <div
+                  key={idx}
+                  style={{
+                    marginBottom: 4,
+                    fontSize: 16,
+                  }}
+                >
                   {idx + 1}. {r.name} — Users: {r.userCount}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
-          {/* Charts */}
-          <div className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
-            <h3>Attractions Popularity</h3>
-            <Bar data={attractionData} options={chartOptions} />
+          {/* Attractions popularity chart */}
+          <div
+            className="card"
+            style={{
+              marginBottom: "1.5rem",
+              padding: "1rem",
+              ...chartContainerStyle,
+              height: 340,
+            }}
+          >
+            <h3 style={{ textAlign: "center" }}>Attractions Popularity</h3>
+            <Bar data={attractionData} options={chartOptions} height={300} />
           </div>
-          <div className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
-            <h3>Restaurants Popularity</h3>
-            <Bar data={restaurantData} options={chartOptions} />
+
+          {/* Restaurants popularity chart */}
+          <div
+            className="card"
+            style={{
+              marginBottom: "1.5rem",
+              padding: "1rem",
+              ...chartContainerStyle,
+              height: 340,
+            }}
+          >
+            <h3 style={{ textAlign: "center" }}>Restaurants Popularity</h3>
+            <Bar data={restaurantData} options={chartOptions} height={300} />
           </div>
         </>
       )}
