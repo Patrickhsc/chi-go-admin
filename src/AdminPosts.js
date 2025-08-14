@@ -1,19 +1,37 @@
-
+// src/AdminPosts.js
 import React, { useState, useEffect } from "react";
+import { adminAPI, communityAPI } from "./services/api"; // ✅ 使用封装好的 API
 
 export default function AdminPosts() {
   const [posts, setPosts] = useState([]);
   const [editingPost, setEditingPost] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
 
-  // Fetch all posts from backend API
+  // 兼容 id / _id
+  const getId = (p) => p?.id ?? p?._id;
+
+  // 拉取全部帖子（GET /admin/posts）
   useEffect(() => {
-    fetch("/api/posts")
-      .then((res) => res.json())
-      .then((data) => setPosts(data))
-      .catch((err) => console.error("Error fetching posts:", err));
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const res = await adminAPI.getAllPosts(); // -> /admin/posts
+        if (!mounted) return;
+        setPosts(res.data || []);
+      } catch (e) {
+        console.error("Error fetching posts:", e?.response || e);
+        setErr(e?.response?.data?.message || e.message || "Load posts failed");
+      } finally {
+        mounted && setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  // Handle input changes for editing
+  // 编辑输入
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingPost((prev) => ({
@@ -22,101 +40,148 @@ export default function AdminPosts() {
     }));
   };
 
-  // Save edited post
-  const saveEdit = (e) => {
+  // 保存编辑（优先 /admin/posts/:id；若 adminAPI.updatePost 不存在则回退到 /api/posts/:id）
+  const saveEdit = async (e) => {
     e.preventDefault();
-    fetch(`/api/posts/${editingPost.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const id = getId(editingPost);
+      if (!id) throw new Error("Missing post id");
+
+      const payload = {
         title: editingPost.title,
         description: editingPost.description,
-        is_public: editingPost.is_public
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
-        setEditingPost(null);
-      })
-      .catch((err) => console.error("Error updating post:", err));
+        is_public: !!editingPost.is_public,
+      };
+
+      const doUpdate =
+        typeof adminAPI.updatePost === "function"
+          ? adminAPI.updatePost // 你若在 api.js 里补了这个则优先用 /admin/posts/:id
+          : communityAPI.updatePost; // 否则使用公共接口 /api/posts/:id
+
+      const res = await doUpdate(id, payload);
+      const updated = res.data || payload;
+
+      // 本地更新
+      setPosts((prev) =>
+        prev.map((p) => (getId(p) === id ? { ...p, ...updated } : p))
+      );
+      setEditingPost(null);
+    } catch (e) {
+      console.error("Error updating post:", e?.response || e);
+      alert(e?.response?.data?.message || e.message || "Update failed");
+    }
   };
 
-  // Cancel editing
+  // 取消编辑
   const cancelEdit = () => setEditingPost(null);
 
-  // Delete a post
-  const deletePost = (postId) => {
+  // 删除（DELETE /admin/posts/:id）
+  const deletePost = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
-    fetch(`/api/posts/${postId}`, { method: "DELETE" })
-      .then((res) => res.json())
-      .then(() => {
-        setPosts((prev) => prev.filter((p) => p.id !== postId));
-      })
-      .catch((err) => console.error("Error deleting post:", err));
+    try {
+      await adminAPI.deletePost(postId);
+      setPosts((prev) => prev.filter((p) => getId(p) !== postId));
+    } catch (e) {
+      console.error("Error deleting post:", e?.response || e);
+      alert(e?.response?.data?.message || e.message || "Delete failed");
+    }
   };
+
+  if (loading) return <div className="container">Loading…</div>;
+  if (err) return <div className="container" style={{ color: "crimson" }}>{err}</div>;
 
   return (
     <div className="container">
       <h2>Admin · All Posts</h2>
       <ul className="list">
         {posts.length === 0 && <li className="muted">No posts found.</li>}
-        {posts.map((post) => (
-          <li key={post.id} className="list-row">
-            {editingPost && editingPost.id === post.id ? (
-              <form onSubmit={saveEdit} className="edit-form">
-                <input
-                  name="title"
-                  value={editingPost.title}
-                  onChange={handleEditChange}
-                  placeholder="Title"
-                  required
-                />
-                <input
-                  name="description"
-                  value={editingPost.description}
-                  onChange={handleEditChange}
-                  placeholder="Description"
-                  required
-                />
-                {/* Public field removed as it should not be editable */}
-                <button type="submit">Save</button>
-                <button type="button" onClick={cancelEdit}>
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <>
-                <div>
-                  <strong>Title:</strong> {post.title}<br />
-                  <strong>Description:</strong> {post.description}<br />
-                  <strong>User ID:</strong> {post.user_id}<br />
-                  <strong>Checklist:</strong>
-                  <ul style={{ margin: '0 0 0 1em', padding: 0 }}>
-                    {Array.isArray(post.checklist) && post.checklist.length > 0 ? (
-                      post.checklist.map((item, idx) => (
-                        <li key={idx}>
-                          {item.name} <span style={{color:'#888'}}>({item.itemType})</span>
-                        </li>
-                      ))
-                    ) : (
-                      <li style={{color:'#888'}}>No items</li>
+        {posts.map((post) => {
+          const id = getId(post);
+          const isEditing = editingPost && getId(editingPost) === id;
+
+          return (
+            <li key={id} className="list-row">
+              {isEditing ? (
+                <form onSubmit={saveEdit} className="edit-form">
+                  <input
+                    name="title"
+                    value={editingPost.title || ""}
+                    onChange={handleEditChange}
+                    placeholder="Title"
+                    required
+                  />
+                  <input
+                    name="description"
+                    value={editingPost.description || ""}
+                    onChange={handleEditChange}
+                    placeholder="Description"
+                    required
+                  />
+                  {/* is_public 仅展示或按需编辑；这里保留开关（可选） */}
+                  <label style={{ marginLeft: 8 }}>
+                    Public:&nbsp;
+                    <input
+                      type="checkbox"
+                      name="is_public"
+                      checked={!!editingPost.is_public}
+                      onChange={handleEditChange}
+                    />
+                  </label>
+
+                  <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
+                    <button type="submit">Save</button>
+                    <button type="button" onClick={cancelEdit}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div>
+                    <strong>Title:</strong> {post.title}
+                    <br />
+                    <strong>Description:</strong> {post.description}
+                    <br />
+                    <strong>User ID:</strong> {post.user_id}
+                    <br />
+                    <strong>Checklist:</strong>
+                    <ul style={{ margin: "0 0 0 1em", padding: 0 }}>
+                      {Array.isArray(post.checklist) && post.checklist.length > 0 ? (
+                        post.checklist.map((item, idx) => (
+                          <li key={idx}>
+                            {item.name}{" "}
+                            <span style={{ color: "#888" }}>
+                              ({item.itemType})
+                            </span>
+                          </li>
+                        ))
+                      ) : (
+                        <li style={{ color: "#888" }}>No items</li>
+                      )}
+                    </ul>
+                    <strong>Public:</strong> {post.is_public ? "Yes" : "No"}
+                    <br />
+                    {post.created_at && (
+                      <>
+                        <strong>Created:</strong> {post.created_at}
+                        <br />
+                      </>
                     )}
-                  </ul>
-                  <strong>Public:</strong> {post.is_public ? "Yes" : "No"}<br />
-                  <strong>Created:</strong> {post.created_at}<br />
-                  <strong>Updated:</strong> {post.updated_at}
-                </div>
-                <div className="actions">
-                  <button onClick={() => setEditingPost(post)}>Edit</button>
-                  <button className="danger" onClick={() => deletePost(post.id)}>
-                    Delete
-                  </button>
-                </div>
-              </>
-            )}
-          </li>
-        ))}
+                    {post.updated_at && (
+                      <strong>Updated:</strong> {post.updated_at}
+                    )}
+                  </div>
+                  <div className="actions">
+                    <button onClick={() => setEditingPost(post)}>Edit</button>
+                    <button className="danger" onClick={() => deletePost(id)}>
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
