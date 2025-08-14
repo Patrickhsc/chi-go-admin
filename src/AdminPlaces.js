@@ -1,10 +1,9 @@
-// src/AdminPlaces.js
 import React, { useState, useEffect, useMemo } from "react";
 import {
   attractionsAPI,
   restaurantsAPI,
   adminAPI,
-} from "./services/api"; // ✅ 使用封装好的客户端
+} from "./services/api";
 
 export default function AdminPlaces() {
   const [places, setPlaces] = useState([]);
@@ -17,7 +16,20 @@ export default function AdminPlaces() {
   // 兼容 id / _id
   const getId = (p) => p?.id ?? p?._id;
 
-  // 后端把景点/餐厅分成两个集合；这里合并成一个列表展示
+  // 兼容location对象与平铺字段
+  const normalizePlace = (p, category) => {
+    // 支持API返回的location对象和老字段
+    const loc = p.location || {};
+    return {
+      ...p,
+      category,
+      location_lat: loc.lat ?? p.location_lat ?? "",
+      location_lng: loc.lng ?? p.location_lng ?? "",
+      location_address: loc.address ?? p.location_address ?? "",
+      is_active: typeof p.is_active !== "undefined" ? p.is_active : (typeof p.isActive !== "undefined" ? p.isActive : true),
+    };
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -25,31 +37,25 @@ export default function AdminPlaces() {
       setErr(null);
       try {
         const [aRes, rRes] = await Promise.all([
-          attractionsAPI.getAll(), // GET /api/attractions
-          restaurantsAPI.getAll(), // GET /api/restaurants
+          attractionsAPI.getAll(),
+          restaurantsAPI.getAll(),
         ]);
-
-        const attractions = (aRes.data || []).map((x) => ({
-          category: "Attraction",
-          ...x,
-        }));
-        const restaurants = (rRes.data || []).map((x) => ({
-          category: "Restaurant",
-          ...x,
-        }));
-
+        const attractions = (aRes.data || []).map((x) =>
+          normalizePlace(x, "Attraction")
+        );
+        const restaurants = (rRes.data || []).map((x) =>
+          normalizePlace(x, "Restaurant")
+        );
         const all = [...attractions, ...restaurants];
         if (!mounted) return;
         setPlaces(all);
         setFilteredPlaces(all);
       } catch (e) {
-        console.error("Error fetching places:", e?.response || e);
         setErr(e?.response?.data?.message || e.message || "Load places failed");
       } finally {
         mounted && setLoading(false);
       }
     })();
-
     return () => {
       mounted = false;
     };
@@ -73,6 +79,23 @@ export default function AdminPlaces() {
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") handleSearch();
+  };
+
+  // 保证编辑时字段完整
+  const editPlace = (place) => {
+    setEditingPlace({
+      name: place.name || "",
+      description: place.description || "",
+      location_address: place.location_address || "",
+      location_lat: place.location_lat || "",
+      location_lng: place.location_lng || "",
+      image: place.image || "",
+      is_active: typeof place.is_active === "undefined" ? true : place.is_active,
+      category: place.category,
+      id: getId(place),
+      _id: place._id,
+      // 可以扩展其它字段
+    });
   };
 
   // 编辑输入
@@ -115,36 +138,60 @@ export default function AdminPlaces() {
       const id = getId(editingPlace);
       if (!id) throw new Error("Missing place id");
 
+      // 重新组装为后端需要的结构
       const payload = {
         name: editingPlace.name,
         description: editingPlace.description,
-        location_address: editingPlace.location_address,
-        location_lat: editingPlace.location_lat,
-        location_lng: editingPlace.location_lng,
         image: editingPlace.image,
-        is_active: !!editingPlace.is_active,
+        location: {
+          lat: editingPlace.location_lat,
+          lng: editingPlace.location_lng,
+          address: editingPlace.location_address,
+        },
+        isActive: !!editingPlace.is_active,
       };
 
       const { update } = getAdminOps(editingPlace);
       await update(id, payload);
 
-      // 本地更新，避免全量再拉一遍
+      // 本地更新
       setPlaces((prev) =>
-        prev.map((p) => (getId(p) === id ? { ...p, ...payload } : p))
+        prev.map((p) =>
+          getId(p) === id
+            ? {
+                ...p,
+                ...editingPlace,
+                location_lat: editingPlace.location_lat,
+                location_lng: editingPlace.location_lng,
+                location_address: editingPlace.location_address,
+                is_active: editingPlace.is_active,
+              }
+            : p
+        )
       );
       setFilteredPlaces((prev) =>
-        prev.map((p) => (getId(p) === id ? { ...p, ...payload } : p))
+        prev.map((p) =>
+          getId(p) === id
+            ? {
+                ...p,
+                ...editingPlace,
+                location_lat: editingPlace.location_lat,
+                location_lng: editingPlace.location_lng,
+                location_address: editingPlace.location_address,
+                is_active: editingPlace.is_active,
+              }
+            : p
+        )
       );
       setEditingPlace(null);
     } catch (e) {
-      console.error("Error updating place:", e?.response || e);
       alert(e?.response?.data?.message || e.message || "Update failed");
     }
   };
 
   const cancelEdit = () => setEditingPlace(null);
 
-  // 删除（DELETE /admin/attractions/:id 或 /admin/restaurants/:id）
+  // 删除
   const deletePlace = async (id, place) => {
     if (!window.confirm("Are you sure you want to delete this place?")) return;
     try {
@@ -154,7 +201,6 @@ export default function AdminPlaces() {
       setPlaces((prev) => prev.filter((p) => getId(p) !== id));
       setFilteredPlaces((prev) => prev.filter((p) => getId(p) !== id));
     } catch (e) {
-      console.error("Error deleting place:", e?.response || e);
       alert(e?.response?.data?.message || e.message || "Delete failed");
     }
   };
@@ -209,6 +255,15 @@ export default function AdminPlaces() {
             onChange={handleEditChange}
             placeholder="Image URL"
           />
+          <label style={{marginLeft: "8px"}}>
+            <input
+              name="is_active"
+              type="checkbox"
+              checked={!!editingPlace.is_active}
+              onChange={handleEditChange}
+            />
+            Active
+          </label>
           <div style={{ display: "inline-flex", gap: 8, marginLeft: 8 }}>
             <button type="submit">Save</button>
             <button type="button" onClick={cancelEdit}>
@@ -260,7 +315,7 @@ export default function AdminPlaces() {
             </div>
           </div>
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-            <button onClick={() => setEditingPlace(place)}>Edit</button>
+            <button onClick={() => editPlace(place)}>Edit</button>
             <button
               className="danger"
               onClick={() => deletePlace(getId(place), place)}
@@ -279,7 +334,6 @@ export default function AdminPlaces() {
   return (
     <div className="container">
       <h2>Admin · All Attractions/Restaurants</h2>
-
       <div
         className="card"
         style={{
