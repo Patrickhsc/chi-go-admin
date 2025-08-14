@@ -1,5 +1,11 @@
 {
   "navigationFallback": {
-    "rewrite": "/index.html"
-  }
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*","/*.css","/*.js","/favicon.ico","/api/*","/auth/*","/admin/*"]
+  },
+  "routes": [
+    { "route": "/api/{*rest}",   "rewrite": "https://chigo8000-cjfxabcnduf5aycr.centralus-01.azurewebsites.net/api/{rest}" },
+    { "route": "/auth/{*rest}",  "rewrite": "https://chigo8000-cjfxabcnduf5aycr.centralus-01.azurewebsites.net/auth/{rest}" },
+    { "route": "/admin/{*rest}", "rewrite": "https://chigo8000-cjfxabcnduf5aycr.centralus-01.azurewebsites.net/admin/{rest}" }
+  ]
 }
