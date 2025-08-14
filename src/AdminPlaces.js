@@ -1,83 +1,162 @@
-
+// src/AdminPlaces.js
 import React, { useState, useEffect, useMemo } from "react";
+import {
+  attractionsAPI,
+  restaurantsAPI,
+  adminAPI,
+} from "./services/api"; // ✅ 使用封装好的客户端
 
 export default function AdminPlaces() {
   const [places, setPlaces] = useState([]);
   const [query, setQuery] = useState("");
   const [filteredPlaces, setFilteredPlaces] = useState([]);
   const [editingPlace, setEditingPlace] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
 
+  // 兼容 id / _id
+  const getId = (p) => p?.id ?? p?._id;
+
+  // 后端把景点/餐厅分成两个集合；这里合并成一个列表展示
   useEffect(() => {
-    fetch("/api/places")
-      .then((res) => res.json())
-      .then((data) => {
-        setPlaces(data);
-        setFilteredPlaces(data);
-      })
-      .catch((err) => console.error("Error fetching places:", err));
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const [aRes, rRes] = await Promise.all([
+          attractionsAPI.getAll(), // GET /api/attractions
+          restaurantsAPI.getAll(), // GET /api/restaurants
+        ]);
+
+        const attractions = (aRes.data || []).map((x) => ({
+          category: "Attraction",
+          ...x,
+        }));
+        const restaurants = (rRes.data || []).map((x) => ({
+          category: "Restaurant",
+          ...x,
+        }));
+
+        const all = [...attractions, ...restaurants];
+        if (!mounted) return;
+        setPlaces(all);
+        setFilteredPlaces(all);
+      } catch (e) {
+        console.error("Error fetching places:", e?.response || e);
+        setErr(e?.response?.data?.message || e.message || "Load places failed");
+      } finally {
+        mounted && setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  // 搜索
   const handleSearch = () => {
     const q = query.trim().toLowerCase();
     if (!q) {
       setFilteredPlaces(places);
-    } else {
-      setFilteredPlaces(
-        places.filter((p) =>
-          [p.category, p.name, p.location_address, p.description].some((f) =>
-            f && f.toLowerCase().includes(q)
-          )
-        )
-      );
+      return;
     }
+    setFilteredPlaces(
+      places.filter((p) =>
+        [p.category, p.name, p.location_address, p.description]
+          .filter(Boolean)
+          .some((f) => String(f).toLowerCase().includes(q))
+      )
+    );
   };
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") handleSearch();
   };
 
+  // 编辑输入
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingPlace((prev) => ({
       ...prev,
       [name]:
         name === "is_active"
-          ? (type === "checkbox" ? checked : value === "true")
-          : (type === "checkbox" ? checked : value),
+          ? type === "checkbox"
+            ? checked
+            : value === "true"
+          : type === "checkbox"
+          ? checked
+          : value,
     }));
   };
 
-  const saveEdit = (e) => {
+  // 根据分类选择 admin 接口
+  const getAdminOps = (place) => {
+    if (place.category === "Attraction") {
+      return {
+        update: adminAPI.updateAttraction,
+        remove: adminAPI.deleteAttraction,
+      };
+    }
+    if (place.category === "Restaurant") {
+      return {
+        update: adminAPI.updateRestaurant,
+        remove: adminAPI.deleteRestaurant,
+      };
+    }
+    throw new Error("Unknown category: " + place.category);
+  };
+
+  // 保存编辑（PUT /admin/attractions/:id 或 /admin/restaurants/:id）
+  const saveEdit = async (e) => {
     e.preventDefault();
-    fetch(`/api/places/${editingPlace.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editingPlace),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setEditingPlace(null);
-        // Auto-refresh: re-fetch places from backend
-        fetch("/api/places")
-          .then((res) => res.json())
-          .then((data) => {
-            setPlaces(data);
-            setFilteredPlaces(data);
-          });
-      })
-      .catch((err) => console.error("Error updating place:", err));
+    try {
+      const id = getId(editingPlace);
+      if (!id) throw new Error("Missing place id");
+
+      const payload = {
+        name: editingPlace.name,
+        description: editingPlace.description,
+        location_address: editingPlace.location_address,
+        location_lat: editingPlace.location_lat,
+        location_lng: editingPlace.location_lng,
+        image: editingPlace.image,
+        is_active: !!editingPlace.is_active,
+      };
+
+      const { update } = getAdminOps(editingPlace);
+      await update(id, payload);
+
+      // 本地更新，避免全量再拉一遍
+      setPlaces((prev) =>
+        prev.map((p) => (getId(p) === id ? { ...p, ...payload } : p))
+      );
+      setFilteredPlaces((prev) =>
+        prev.map((p) => (getId(p) === id ? { ...p, ...payload } : p))
+      );
+      setEditingPlace(null);
+    } catch (e) {
+      console.error("Error updating place:", e?.response || e);
+      alert(e?.response?.data?.message || e.message || "Update failed");
+    }
   };
 
   const cancelEdit = () => setEditingPlace(null);
 
-  const deletePlace = (id) => {
-    fetch(`/api/places/${id}`, { method: "DELETE" })
-      .then((res) => res.json())
-      .then(() => {
-        setPlaces((prev) => prev.filter((p) => p.id !== id));
-        setFilteredPlaces((prev) => prev.filter((p) => p.id !== id));
-      })
-      .catch((err) => console.error("Error deleting place:", err));
+  // 删除（DELETE /admin/attractions/:id 或 /admin/restaurants/:id）
+  const deletePlace = async (id, place) => {
+    if (!window.confirm("Are you sure you want to delete this place?")) return;
+    try {
+      const { remove } = getAdminOps(place);
+      await remove(id);
+
+      setPlaces((prev) => prev.filter((p) => getId(p) !== id));
+      setFilteredPlaces((prev) => prev.filter((p) => getId(p) !== id));
+    } catch (e) {
+      console.error("Error deleting place:", e?.response || e);
+      alert(e?.response?.data?.message || e.message || "Delete failed");
+    }
   };
 
   const attractions = useMemo(
@@ -90,52 +169,126 @@ export default function AdminPlaces() {
   );
 
   const renderPlaceRow = (place) => (
-    <li key={place.id} className="list-row">
-      {editingPlace && editingPlace.id === place.id ? (
+    <li key={getId(place)} className="list-row">
+      {editingPlace && getId(editingPlace) === getId(place) ? (
         <form onSubmit={saveEdit} className="edit-form">
-          <input name="name" value={editingPlace.name} onChange={handleEditChange} placeholder="Name" required />
-          <input name="description" value={editingPlace.description} onChange={handleEditChange} placeholder="Description" />
-          <input name="location_address" value={editingPlace.location_address} onChange={handleEditChange} placeholder="Address" />
-          <input name="location_lat" value={editingPlace.location_lat} onChange={handleEditChange} placeholder="Latitude" />
-          <input name="location_lng" value={editingPlace.location_lng} onChange={handleEditChange} placeholder="Longitude" />
-          <input name="image" value={editingPlace.image || ''} onChange={handleEditChange} placeholder="Image URL" />
-          {/* Active field removed as requested */}
-          <button type="submit">Save</button>
-                  <td>
-                    {place.image ? (
-                      <a href={place.image} target="_blank" rel="noopener noreferrer">{place.image}</a>
-                    ) : (
-                      <span style={{color: 'gray'}}>No image</span>
-                    )}
-                  </td>
+          <input
+            name="name"
+            value={editingPlace.name || ""}
+            onChange={handleEditChange}
+            placeholder="Name"
+            required
+          />
+          <input
+            name="description"
+            value={editingPlace.description || ""}
+            onChange={handleEditChange}
+            placeholder="Description"
+          />
+          <input
+            name="location_address"
+            value={editingPlace.location_address || ""}
+            onChange={handleEditChange}
+            placeholder="Address"
+          />
+          <input
+            name="location_lat"
+            value={editingPlace.location_lat || ""}
+            onChange={handleEditChange}
+            placeholder="Latitude"
+          />
+          <input
+            name="location_lng"
+            value={editingPlace.location_lng || ""}
+            onChange={handleEditChange}
+            placeholder="Longitude"
+          />
+          <input
+            name="image"
+            value={editingPlace.image || ""}
+            onChange={handleEditChange}
+            placeholder="Image URL"
+          />
+          <div style={{ display: "inline-flex", gap: 8, marginLeft: 8 }}>
+            <button type="submit">Save</button>
+            <button type="button" onClick={cancelEdit}>
+              Cancel
+            </button>
+          </div>
         </form>
       ) : (
         <>
           <div>
             <strong>{place.category}</strong> — {place.name}
             <div className="muted">
-              <span>Description: {place.description}</span><br />
-              <span>Address: {place.location_address}</span><br />
-              <span>Lat/Lng: {place.location_lat}, {place.location_lng}</span><br />
-              {place.image && <span>Image: <a href={place.image} target="_blank" rel="noopener noreferrer">View</a></span>}<br />
-              <span>Active: {place.is_active ? "Yes" : "No"}</span><br />
-              <span>Created: {place.created_at}</span><br />
-              <span>Updated: {place.updated_at}</span>
+              <span>Description: {place.description}</span>
+              <br />
+              <span>Address: {place.location_address}</span>
+              <br />
+              <span>
+                Lat/Lng: {place.location_lat}, {place.location_lng}
+              </span>
+              <br />
+              {place.image && (
+                <>
+                  <span>
+                    Image:{" "}
+                    <a
+                      href={place.image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View
+                    </a>
+                  </span>
+                  <br />
+                </>
+              )}
+              {typeof place.is_active !== "undefined" && (
+                <>
+                  <span>Active: {place.is_active ? "Yes" : "No"}</span>
+                  <br />
+                </>
+              )}
+              {place.created_at && (
+                <>
+                  <span>Created: {place.created_at}</span>
+                  <br />
+                </>
+              )}
+              {place.updated_at && <span>Updated: {place.updated_at}</span>}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
             <button onClick={() => setEditingPlace(place)}>Edit</button>
-            <button className="danger" onClick={() => deletePlace(place.id)}>Delete</button>
+            <button
+              className="danger"
+              onClick={() => deletePlace(getId(place), place)}
+            >
+              Delete
+            </button>
           </div>
         </>
       )}
     </li>
   );
 
+  if (loading) return <div className="container">Loading…</div>;
+  if (err) return <div className="container" style={{ color: "crimson" }}>{err}</div>;
+
   return (
     <div className="container">
       <h2>Admin · All Attractions/Restaurants</h2>
-      <div className="card" style={{ marginBottom: "1rem", padding: "1rem", display: "flex", alignItems: "center" }}>
+
+      <div
+        className="card"
+        style={{
+          marginBottom: "1rem",
+          padding: "1rem",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
         <input
           placeholder="Search by type/name/address/code"
           value={query}
@@ -160,7 +313,7 @@ export default function AdminPlaces() {
         </button>
       </div>
 
-      {/* Attractions Box */}
+      {/* Attractions */}
       <div className="card" style={{ marginTop: "1rem" }}>
         <h3>Attractions</h3>
         <ul className="list">
@@ -169,7 +322,7 @@ export default function AdminPlaces() {
         </ul>
       </div>
 
-      {/* Restaurants Box */}
+      {/* Restaurants */}
       <div className="card" style={{ marginTop: "1rem" }}>
         <h3>Restaurants</h3>
         <ul className="list">
@@ -179,5 +332,4 @@ export default function AdminPlaces() {
       </div>
     </div>
   );
-
 }
