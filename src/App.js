@@ -46,7 +46,7 @@ function HeaderNav({ isLoggedIn, username, onLogout }) {
           justifyContent: "center",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: "1.8rem", color: "#fff" }}>
+        <h1 style={{ margin: 0, fontSize: "1.8rem", color: "#394150" }}>
           Chi-go Admin
         </h1>
       </div>
@@ -77,7 +77,7 @@ function HeaderNav({ isLoggedIn, username, onLogout }) {
           </NavLink>
         ) : (
           <>
-            <span style={{ color: "#fff", fontWeight: 500 }}>
+            <span style={{ color: "#394150", fontWeight: 500 }}>
               Hello, {username || "Admin"}
             </span>
             <button
