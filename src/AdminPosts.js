@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { adminAPI, communityAPI } from "./services/api"; // ✅ 使用封装好的 API
+import { adminAPI, communityAPI } from "./services/api";
 
 export default function AdminPosts() {
   const [posts, setPosts] = useState([]);
@@ -7,21 +7,18 @@ export default function AdminPosts() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  // 兼容 id / _id
   const getId = (p) => p?.id ?? p?._id;
 
-  // 拉取全部帖子（GET /admin/posts）
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
         setErr(null);
-        const res = await adminAPI.getAllPosts(); // -> /admin/posts
+        const res = await adminAPI.getAllPosts();
         if (!mounted) return;
         setPosts(res.data || []);
       } catch (e) {
-        console.error("Error fetching posts:", e?.response || e);
         setErr(e?.response?.data?.message || e.message || "Load posts failed");
       } finally {
         mounted && setLoading(false);
@@ -30,7 +27,6 @@ export default function AdminPosts() {
     return () => { mounted = false; };
   }, []);
 
-  // 编辑输入
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingPost((prev) => ({
@@ -39,7 +35,6 @@ export default function AdminPosts() {
     }));
   };
 
-  // 保存编辑（优先 /admin/posts/:id；否则回退 /api/posts/:id）
   const saveEdit = async (e) => {
     e.preventDefault();
     try {
@@ -65,21 +60,18 @@ export default function AdminPosts() {
       );
       setEditingPost(null);
     } catch (e) {
-      console.error("Error updating post:", e?.response || e);
       alert(e?.response?.data?.message || e.message || "Update failed");
     }
   };
 
   const cancelEdit = () => setEditingPost(null);
 
-  // 删除（DELETE /admin/posts/:id）
   const deletePost = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
     try {
       await adminAPI.deletePost(postId);
       setPosts((prev) => prev.filter((p) => getId(p) !== postId));
     } catch (e) {
-      console.error("Error deleting post:", e?.response || e);
       alert(e?.response?.data?.message || e.message || "Delete failed");
     }
   };
@@ -99,42 +91,41 @@ export default function AdminPosts() {
           return (
             <li key={id} className="list-row">
               <div className="post-box">
-                {isEditing ? (
-                  <form onSubmit={saveEdit} className="edit-form">
-                    <input
-                      name="title"
-                      value={editingPost.title || ""}
-                      onChange={handleEditChange}
-                      placeholder="Title"
-                      required
-                    />
-                    <input
-                      name="description"
-                      value={editingPost.description || ""}
-                      onChange={handleEditChange}
-                      placeholder="Description"
-                      required
-                    />
-                    <label style={{ marginLeft: 8 }}>
-                      Public:&nbsp;
+                <div className="post-content">
+                  {isEditing ? (
+                    <form onSubmit={saveEdit} className="edit-form">
                       <input
-                        type="checkbox"
-                        name="is_public"
-                        checked={!!editingPost.is_public}
+                        name="title"
+                        value={editingPost.title || ""}
                         onChange={handleEditChange}
+                        placeholder="Title"
+                        required
                       />
-                    </label>
-
-                    <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
-                      <button type="submit">Save</button>
-                      <button type="button" onClick={cancelEdit}>
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div>
+                      <input
+                        name="description"
+                        value={editingPost.description || ""}
+                        onChange={handleEditChange}
+                        placeholder="Description"
+                        required
+                      />
+                      <label style={{ marginLeft: 8 }}>
+                        Public:&nbsp;
+                        <input
+                          type="checkbox"
+                          name="is_public"
+                          checked={!!editingPost.is_public}
+                          onChange={handleEditChange}
+                        />
+                      </label>
+                      <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
+                        <button type="submit">Save</button>
+                        <button type="button" onClick={cancelEdit}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
                       <strong>Title:</strong> {post.title}
                       <br />
                       <strong>Description:</strong> {post.description}
@@ -169,14 +160,16 @@ export default function AdminPosts() {
                           <strong>Updated:</strong> {post.updated_at}
                         </>
                       )}
-                    </div>
-                    <div className="actions">
-                      <button onClick={() => setEditingPost(post)}>Edit</button>
-                      <button className="danger" onClick={() => deletePost(id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </>
+                    </>
+                  )}
+                </div>
+                {!isEditing && (
+                  <div className="post-actions">
+                    <button onClick={() => setEditingPost(post)}>Edit</button>
+                    <button className="danger" onClick={() => deletePost(id)}>
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
             </li>
