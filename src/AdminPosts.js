@@ -1,4 +1,3 @@
-// src/AdminPosts.js
 import React, { useState, useEffect } from "react";
 import { adminAPI, communityAPI } from "./services/api"; // ✅ 使用封装好的 API
 
@@ -99,85 +98,87 @@ export default function AdminPosts() {
 
           return (
             <li key={id} className="list-row">
-              {isEditing ? (
-                <form onSubmit={saveEdit} className="edit-form">
-                  <input
-                    name="title"
-                    value={editingPost.title || ""}
-                    onChange={handleEditChange}
-                    placeholder="Title"
-                    required
-                  />
-                  <input
-                    name="description"
-                    value={editingPost.description || ""}
-                    onChange={handleEditChange}
-                    placeholder="Description"
-                    required
-                  />
-                  <label style={{ marginLeft: 8 }}>
-                    Public:&nbsp;
+              <div className="post-box">
+                {isEditing ? (
+                  <form onSubmit={saveEdit} className="edit-form">
                     <input
-                      type="checkbox"
-                      name="is_public"
-                      checked={!!editingPost.is_public}
+                      name="title"
+                      value={editingPost.title || ""}
                       onChange={handleEditChange}
+                      placeholder="Title"
+                      required
                     />
-                  </label>
+                    <input
+                      name="description"
+                      value={editingPost.description || ""}
+                      onChange={handleEditChange}
+                      placeholder="Description"
+                      required
+                    />
+                    <label style={{ marginLeft: 8 }}>
+                      Public:&nbsp;
+                      <input
+                        type="checkbox"
+                        name="is_public"
+                        checked={!!editingPost.is_public}
+                        onChange={handleEditChange}
+                      />
+                    </label>
 
-                  <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
-                    <button type="submit">Save</button>
-                    <button type="button" onClick={cancelEdit}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <div>
-                    <strong>Title:</strong> {post.title}
-                    <br />
-                    <strong>Description:</strong> {post.description}
-                    <br />
-                    <strong>User ID:</strong> {post.user_id}
-                    <br />
-                    <strong>Checklist:</strong>
-                    <ul style={{ margin: "0 0 0 1em", padding: 0 }}>
-                      {Array.isArray(post.checklist) && post.checklist.length > 0 ? (
-                        post.checklist.map((item, idx) => (
-                          <li key={idx}>
-                            {item.name}{" "}
-                            <span style={{ color: "#888" }}>
-                              ({item.itemType})
-                            </span>
-                          </li>
-                        ))
-                      ) : (
-                        <li style={{ color: "#888" }}>No items</li>
+                    <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
+                      <button type="submit">Save</button>
+                      <button type="button" onClick={cancelEdit}>
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div>
+                      <strong>Title:</strong> {post.title}
+                      <br />
+                      <strong>Description:</strong> {post.description}
+                      <br />
+                      <strong>User ID:</strong> {post.user_id}
+                      <br />
+                      <strong>Checklist:</strong>
+                      <ul style={{ margin: "0 0 0 1em", padding: 0 }}>
+                        {Array.isArray(post.checklist) && post.checklist.length > 0 ? (
+                          post.checklist.map((item, idx) => (
+                            <li key={idx}>
+                              {item.name}{" "}
+                              <span style={{ color: "#888" }}>
+                                ({item.itemType})
+                              </span>
+                            </li>
+                          ))
+                        ) : (
+                          <li style={{ color: "#888" }}>No items</li>
+                        )}
+                      </ul>
+                      <strong>Public:</strong> {post.is_public ? "Yes" : "No"}
+                      <br />
+                      {post.created_at && (
+                        <>
+                          <strong>Created:</strong> {post.created_at}
+                          <br />
+                        </>
                       )}
-                    </ul>
-                    <strong>Public:</strong> {post.is_public ? "Yes" : "No"}
-                    <br />
-                    {post.created_at && (
-                      <>
-                        <strong>Created:</strong> {post.created_at}
-                        <br />
-                      </>
-                    )}
-                    {post.updated_at && (
-                      <>
-                        <strong>Updated:</strong> {post.updated_at}
-                      </>
-                    )}
-                  </div>
-                  <div className="actions">
-                    <button onClick={() => setEditingPost(post)}>Edit</button>
-                    <button className="danger" onClick={() => deletePost(id)}>
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
+                      {post.updated_at && (
+                        <>
+                          <strong>Updated:</strong> {post.updated_at}
+                        </>
+                      )}
+                    </div>
+                    <div className="actions">
+                      <button onClick={() => setEditingPost(post)}>Edit</button>
+                      <button className="danger" onClick={() => deletePost(id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </li>
           );
         })}
