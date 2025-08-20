@@ -38,10 +38,13 @@
 }
 
 .post-box {
-  border: 2px solid #e23;
-  border-radius: 6px;
-  padding: 24px;
-  margin-bottom: 24px;
-  background: #fafafa;
+  border: 1.5px solid #efefef;      
+  border-radius: 10px;              
+  background: #fcfcfc;             
+  width: 100%;                     
   box-sizing: border-box;
+  padding: 24px 32px;              
+  margin-bottom: 32px;            
+  box-shadow: none;            
+  transition: border-color 0.2s;
 }
