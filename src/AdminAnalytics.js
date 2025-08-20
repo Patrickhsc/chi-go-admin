@@ -233,7 +233,7 @@ export default function AdminAnalytics() {
 
   return (
     <div className="container">
-      <h2 style={{ textAlign: "center", margin: "2rem 0" }}>Admin · Analytics</h2>
+      <h2 style={{margin: "2rem 0" }}>Admin · Analytics</h2>
 
       {loading && <div>Loading analytics...</div>}
       {!loading && error && <div style={{ color: "red" }}>{error}</div>}
@@ -246,7 +246,7 @@ export default function AdminAnalytics() {
             style={{
               marginBottom: "1rem",
               padding: "1rem",
-              textAlign: "center",
+              
             }}
           >
             <h3>Total Users</h3>
