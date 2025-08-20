@@ -37,14 +37,31 @@
   }
 }
 
+
 .post-box {
-  border: 1.5px solid #efefef;      
-  border-radius: 10px;              
-  background: #fcfcfc;             
-  width: 100%;                     
+  border: 1.5px solid #efefef;
+  border-radius: 12px;
+  background: transparent;      
+  width: 100%;
   box-sizing: border-box;
-  padding: 24px 32px;              
-  margin-bottom: 32px;            
-  box-shadow: none;            
-  transition: border-color 0.2s;
+  padding: 24px 32px 18px 32px;
+  margin-bottom: 16px;      
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+
+.post-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.post-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-start;
+  margin-left: 12px;
 }
