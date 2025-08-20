@@ -72,10 +72,10 @@ export default function AdminUsers() {
       await adminAPI.deleteUser(userId);
       await fetchUsers();
     } catch (e) {
-      console.error("Error deleting user:", e?.response || e);
-      alert(e?.response?.data?.message || e.message || "Delete failed");
-    }
-  };
+  console.error("Error deleting user:", e, e?.response?.data);
+  alert(e?.response?.data?.message || e.message || "Delete failed");
+}
+
 
   if (loading) return <div className="container">Loading…</div>;
   if (err) return <div className="container" style={{ color: "crimson" }}>{err}</div>;
