@@ -1,6 +1,5 @@
-// src/AdminUsers.js
 import React, { useState, useEffect } from "react";
-import { adminAPI } from "./services/api"; // ✅ 使用封装好的后端客户端（/admin/...）
+import { adminAPI } from "./services/api";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -8,10 +7,8 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  // 统一取 id（兼容 id / _id）
   const getId = (u) => u?.id ?? u?._id;
 
-  // 拉取用户列表（GET /admin/users）
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -19,7 +16,6 @@ export default function AdminUsers() {
       const res = await adminAPI.getAllUsers();
       setUsers(res.data || []);
     } catch (e) {
-      console.error("Error fetching users:", e?.response || e);
       setErr(e?.response?.data?.message || e.message || "Load users failed");
     } finally {
       setLoading(false);
@@ -30,7 +26,6 @@ export default function AdminUsers() {
     fetchUsers();
   }, []);
 
-  // 编辑表单输入处理
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingUser((prev) => ({
@@ -39,13 +34,11 @@ export default function AdminUsers() {
     }));
   };
 
-  // 保存编辑（PUT /admin/users/:id）
   const saveEdit = async (e) => {
     e.preventDefault();
     try {
       const id = getId(editingUser);
       if (!id) throw new Error("Missing user id");
-      // 可根据后端字段精简 payload
       const payload = {
         username: editingUser.username,
         email: editingUser.email,
@@ -57,26 +50,21 @@ export default function AdminUsers() {
       setEditingUser(null);
       await fetchUsers();
     } catch (e) {
-      console.error("Error updating user:", e?.response || e);
       alert(e?.response?.data?.message || e.message || "Update failed");
     }
   };
 
-  // 取消编辑
   const cancelEdit = () => setEditingUser(null);
 
-  // DELETE /admin/users/:id）
-const deleteUser = async (userId) => {
-  if (!window.confirm("Are you sure you want to delete this user?")) return;
-  try {
-    await adminAPI.deleteUser(userId);
-    await fetchUsers();
-  } catch (e) {
-    console.error("Error deleting user:", e, e?.response?.data);
-    alert(e?.response?.data?.message || e.message || "Delete failed");
-  }
-};
-
+  const deleteUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await adminAPI.deleteUser(userId);
+      await fetchUsers();
+    } catch (e) {
+      alert(e?.response?.data?.message || e.message || "Delete failed");
+    }
+  };
 
   if (loading) return <div className="container">Loading…</div>;
   if (err) return <div className="container" style={{ color: "crimson" }}>{err}</div>;
@@ -91,93 +79,91 @@ const deleteUser = async (userId) => {
           const isEditing = editingUser && getId(editingUser) === id;
           return (
             <li key={id} className="list-row">
-              {isEditing ? (
-                <form onSubmit={saveEdit} className="edit-form">
-                  <input
-                    name="username"
-                    value={editingUser.username || ""}
-                    onChange={handleEditChange}
-                    placeholder="Username"
-                    required
-                  />
-                  <input
-                    name="email"
-                    type="email"
-                    value={editingUser.email || ""}
-                    onChange={handleEditChange}
-                    placeholder="Email"
-                    required
-                  />
-                  <input
-                    name="avatar"
-                    value={editingUser.avatar || ""}
-                    onChange={handleEditChange}
-                    placeholder="Avatar URL"
-                  />
-                  <select
-                    name="role"
-                    value={editingUser.role || "user"}
-                    onChange={handleEditChange}
-                  >
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <label style={{ marginLeft: 8 }}>
-                    Active:&nbsp;
-                    <input
-                      type="checkbox"
-                      name="is_active"
-                      checked={!!editingUser.is_active}
-                      onChange={handleEditChange}
-                    />
-                  </label>
-                  <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
-                    <button type="submit">Save</button>
-                    <button type="button" onClick={cancelEdit}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <div>
-                    <strong>{u.username}</strong>{" "}
-                    <span className="muted">({u.role})</span>
-                    <br />
-                    <span>Email: {u.email}</span>
-                    <br />
-                    {u.avatar && (
-                      <>
-                        <span>
-                          Avatar:{" "}
-                          <a
-                            href={u.avatar}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            View
-                          </a>
-                        </span>
-                        <br />
-                      </>
-                    )}
-                    <span>Active: {u.is_active ? "Yes" : "No"}</span>
-                    <br />
-                    {u.created_at && <span>Created: {u.created_at}</span>}
-                    <br />
-                    {u.updated_at && <span>Updated: {u.updated_at}</span>}
-                  </div>
-                  <div className="actions">
+              <div className="post-box" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 32 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {isEditing ? (
+                    <form onSubmit={saveEdit} className="edit-form">
+                      <input
+                        name="username"
+                        value={editingUser.username || ""}
+                        onChange={handleEditChange}
+                        placeholder="Username"
+                        required
+                      />
+                      <input
+                        name="email"
+                        value={editingUser.email || ""}
+                        onChange={handleEditChange}
+                        placeholder="Email"
+                        required
+                      />
+                      <input
+                        name="avatar"
+                        value={editingUser.avatar || ""}
+                        onChange={handleEditChange}
+                        placeholder="Avatar URL"
+                      />
+                      <input
+                        name="role"
+                        value={editingUser.role || ""}
+                        onChange={handleEditChange}
+                        placeholder="Role"
+                        required
+                      />
+                      <label style={{ marginLeft: 8 }}>
+                        Active:&nbsp;
+                        <input
+                          type="checkbox"
+                          name="is_active"
+                          checked={!!editingUser.is_active}
+                          onChange={handleEditChange}
+                        />
+                      </label>
+                      <div style={{ display: "inline-flex", gap: 8, marginLeft: 12 }}>
+                        <button type="submit">Save</button>
+                        <button type="button" onClick={cancelEdit}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <strong>Username:</strong> {u.username}
+                      <br />
+                      <strong>Email:</strong> {u.email}
+                      <br />
+                      <strong>Role:</strong> {u.role}
+                      <br />
+                      <strong>Active:</strong> {u.is_active ? "Yes" : "No"}
+                      <br />
+                      {u.avatar && (
+                        <>
+                          <strong>Avatar:</strong>{" "}
+                          <img
+                            src={u.avatar}
+                            alt="avatar"
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "50%",
+                              verticalAlign: "middle",
+                            }}
+                          />
+                          <br />
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+                {!isEditing && (
+                  <div style={{ display: "flex", flexDirection: "row", gap: 8, alignItems: "flex-start", marginLeft: 12 }}>
                     <button onClick={() => setEditingUser(u)}>Edit</button>
-                    <button
-                      className="danger"
-                      onClick={() => deleteUser(id)}
-                    >
+                    <button className="danger" onClick={() => deleteUser(id)}>
                       Delete
                     </button>
                   </div>
-                </>
-              )}
+                )}
+              </div>
             </li>
           );
         })}
