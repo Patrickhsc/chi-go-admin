@@ -85,7 +85,6 @@ export default function Login({ setIsLoggedIn, setUsername }) {
             <label>Role:</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} required>
               <option value="admin">Admin</option>
-              <option value="user">User</option>
             </select>
           </div>
 
