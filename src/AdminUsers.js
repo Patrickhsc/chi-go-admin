@@ -65,16 +65,17 @@ export default function AdminUsers() {
   // 取消编辑
   const cancelEdit = () => setEditingUser(null);
 
-  // 删除用户（DELETE /admin/users/:id）
-  const deleteUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-    try {
-      await adminAPI.deleteUser(userId);
-      await fetchUsers();
-    } catch (e) {
-  console.error("Error deleting user:", e, e?.response?.data);
-  alert(e?.response?.data?.message || e.message || "Delete failed");
-}
+  // DELETE /admin/users/:id）
+const deleteUser = async (userId) => {
+  if (!window.confirm("Are you sure you want to delete this user?")) return;
+  try {
+    await adminAPI.deleteUser(userId);
+    await fetchUsers();
+  } catch (e) {
+    console.error("Error deleting user:", e, e?.response?.data);
+    alert(e?.response?.data?.message || e.message || "Delete failed");
+  }
+};
 
 
   if (loading) return <div className="container">Loading…</div>;
