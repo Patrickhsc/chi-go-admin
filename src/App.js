@@ -81,17 +81,22 @@ function HeaderNav({ isLoggedIn, username, onLogout }) {
               Hello, {username || "Admin"}
             </span>
             <button
-              className="nav-item"
-              style={{
-                background: "#fff",
-                color: "#333",
-                border: "1px solid #ddd",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
+              className="nav-item logout-btn logout-icon-btn"
               onClick={onLogout}
             >
-              Logout
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 22 22"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ verticalAlign: 'middle', marginRight: '7px' }}
+              >
+                <rect x="3" y="4" width="10" height="14" rx="2" stroke="#545e6f" strokeWidth="2"/>
+                <path d="M15 11H7" stroke="#545e6f" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M11.5 8.5L15 11L11.5 13.5" stroke="#545e6f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span style={{ color: "#545e6f", fontWeight: 400, fontSize: "1.25rem", verticalAlign: 'middle' }}>Logout</span>
             </button>
           </>
         )}
