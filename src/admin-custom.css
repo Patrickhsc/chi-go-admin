@@ -53,12 +53,12 @@
 
 .nav-item:hover,
 .nav-item:focus {
-  color: #1567d4;
+  color: #d52349;
 }
 
 
 .nav-item.active {
-  color: #1567d4;
+  color: #d52349;
   font-weight: 600;
   background: transparent !important;
 }
@@ -70,7 +70,7 @@
   width: 60%;
   height: 3px;
   border-radius: 2px;
-  background: #1567d4;
+  background: #d52349;
   transition: width 0.2s;
 }
 
@@ -88,7 +88,7 @@ button.nav-item {
 }
 
 button.nav-item:hover {
-  color: #1567d4;
+  color: #d52349;
 }
 
 .content {
