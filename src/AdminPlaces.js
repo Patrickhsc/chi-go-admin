@@ -8,6 +8,20 @@ import {
 // Read backend API base URL from environment, fallback to empty string
 const API_BASE = process.env.REACT_APP_API_BASE || "";
 
+// Utility: Upload image file to backend, return the image URL
+async function uploadImageFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  // This endpoint should be implemented in your backend; it should return { url: "image URL" }
+  const resp = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+  if (!resp.ok) throw new Error("Image upload failed");
+  const data = await resp.json();
+  return data.url;
+}
+
 export default function AdminPlaces() {
   const [places, setPlaces] = useState([]);
   const [query, setQuery] = useState("");
@@ -69,7 +83,7 @@ export default function AdminPlaces() {
     };
   }, []);
 
-  // Search functionality
+  // Search functionality for places
   const handleSearch = () => {
     const q = query.trim().toLowerCase();
     if (!q) {
@@ -90,7 +104,7 @@ export default function AdminPlaces() {
     if (e.key === "Enter") handleSearch();
   };
 
-  // Prepare editing state
+  // Prepare editing state for a place
   const editPlace = (place) => {
     setEditingPlace({
       name: place.name || "",
@@ -140,7 +154,7 @@ export default function AdminPlaces() {
     throw new Error("Unknown category: " + place.category);
   };
 
-  // Save edit (PUT to admin endpoint)
+  // Save the place after editing (PUT to admin endpoint)
   const saveEdit = async (e) => {
     e.preventDefault();
     try {
@@ -230,6 +244,7 @@ export default function AdminPlaces() {
     <li key={getId(place)} className="list-row">
       {editingPlace && getId(editingPlace) === getId(place) ? (
         <form onSubmit={saveEdit} className="edit-form">
+          {/* Editable fields for name, description, address, lat/lng */}
           <input
             name="name"
             value={editingPlace.name || ""}
@@ -261,12 +276,53 @@ export default function AdminPlaces() {
             onChange={handleEditChange}
             placeholder="Longitude"
           />
+
+          {/* Image upload input */}
+          <div style={{ margin: "6px 0" }}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                try {
+                  // 1. Upload file and get the image URL from backend
+                  const url = await uploadImageFile(file);
+                  // 2. Set the image URL into the editingPlace state
+                  setEditingPlace((prev) => ({
+                    ...prev,
+                    image: url,
+                  }));
+                } catch (err) {
+                  alert("Upload failed: " + (err.message || err));
+                }
+              }}
+            />
+          </div>
+          {/* Show image preview if there is one */}
+          {editingPlace.image && (
+            <div style={{ margin: "6px 0" }}>
+              <img
+                src={
+                  editingPlace.image.startsWith("http")
+                    ? editingPlace.image
+                    : API_BASE + editingPlace.image
+                }
+                alt="preview"
+                style={{ maxWidth: 80, maxHeight: 80, border: "1px solid #eee" }}
+              />
+            </div>
+          )}
+          {/* Image URL, can be manually edited as well */}
           <input
             name="image"
             value={editingPlace.image || ""}
             onChange={handleEditChange}
             placeholder="Image URL"
+            style={{ width: "60%" }}
           />
+
+          {/* Active checkbox */}
           <label style={{ marginLeft: "8px" }}>
             <input
               name="is_active"
@@ -285,6 +341,7 @@ export default function AdminPlaces() {
         </form>
       ) : (
         <>
+          {/* Display mode for place row */}
           <div>
             <strong>{place.category}</strong> — {place.name}
             <div className="muted">
@@ -301,7 +358,6 @@ export default function AdminPlaces() {
                   <span>
                     Image:{" "}
                     <a
-                      // If image is a full URL, use as is; if not, append API_BASE
                       href={
                         place.image.startsWith("http")
                           ? place.image
