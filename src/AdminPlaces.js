@@ -5,6 +5,9 @@ import {
   adminAPI,
 } from "./services/api";
 
+// Read backend API base URL from environment, fallback to empty string
+const API_BASE = process.env.REACT_APP_API_BASE || "";
+
 export default function AdminPlaces() {
   const [places, setPlaces] = useState([]);
   const [query, setQuery] = useState("");
@@ -13,12 +16,11 @@ export default function AdminPlaces() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
-  // 兼容 id / _id
+  // Helper to get id (supports both 'id' and '_id' fields)
   const getId = (p) => p?.id ?? p?._id;
 
-  // 兼容location对象与平铺字段
+  // Normalize place object to support both location object and flat fields
   const normalizePlace = (p, category) => {
-    // 支持API返回的location对象和老字段
     const loc = p.location || {};
     return {
       ...p,
@@ -26,10 +28,16 @@ export default function AdminPlaces() {
       location_lat: loc.lat ?? p.location_lat ?? "",
       location_lng: loc.lng ?? p.location_lng ?? "",
       location_address: loc.address ?? p.location_address ?? "",
-      is_active: typeof p.is_active !== "undefined" ? p.is_active : (typeof p.isActive !== "undefined" ? p.isActive : true),
+      is_active:
+        typeof p.is_active !== "undefined"
+          ? p.is_active
+          : typeof p.isActive !== "undefined"
+          ? p.isActive
+          : true,
     };
   };
 
+  // Load places from backend on mount
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -61,7 +69,7 @@ export default function AdminPlaces() {
     };
   }, []);
 
-  // 搜索
+  // Search functionality
   const handleSearch = () => {
     const q = query.trim().toLowerCase();
     if (!q) {
@@ -77,11 +85,12 @@ export default function AdminPlaces() {
     );
   };
 
+  // Search on Enter key press
   const handleKeyPress = (e) => {
     if (e.key === "Enter") handleSearch();
   };
 
-  // 保证编辑时字段完整
+  // Prepare editing state
   const editPlace = (place) => {
     setEditingPlace({
       name: place.name || "",
@@ -90,15 +99,15 @@ export default function AdminPlaces() {
       location_lat: place.location_lat || "",
       location_lng: place.location_lng || "",
       image: place.image || "",
-      is_active: typeof place.is_active === "undefined" ? true : place.is_active,
+      is_active:
+        typeof place.is_active === "undefined" ? true : place.is_active,
       category: place.category,
       id: getId(place),
       _id: place._id,
-      // 可以扩展其它字段
     });
   };
 
-  // 编辑输入
+  // Handle editing field changes
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingPlace((prev) => ({
@@ -114,7 +123,7 @@ export default function AdminPlaces() {
     }));
   };
 
-  // 根据分类选择 admin 接口
+  // Choose admin API endpoints based on place category
   const getAdminOps = (place) => {
     if (place.category === "Attraction") {
       return {
@@ -131,14 +140,14 @@ export default function AdminPlaces() {
     throw new Error("Unknown category: " + place.category);
   };
 
-  // 保存编辑（PUT /admin/attractions/:id 或 /admin/restaurants/:id）
+  // Save edit (PUT to admin endpoint)
   const saveEdit = async (e) => {
     e.preventDefault();
     try {
       const id = getId(editingPlace);
       if (!id) throw new Error("Missing place id");
 
-      // 重新组装为后端需要的结构
+      // Prepare payload in backend expected format
       const payload = {
         name: editingPlace.name,
         description: editingPlace.description,
@@ -154,7 +163,7 @@ export default function AdminPlaces() {
       const { update } = getAdminOps(editingPlace);
       await update(id, payload);
 
-      // 本地更新
+      // Update local state
       setPlaces((prev) =>
         prev.map((p) =>
           getId(p) === id
@@ -189,9 +198,10 @@ export default function AdminPlaces() {
     }
   };
 
+  // Cancel editing
   const cancelEdit = () => setEditingPlace(null);
 
-  // 删除
+  // Delete a place
   const deletePlace = async (id, place) => {
     if (!window.confirm("Are you sure you want to delete this place?")) return;
     try {
@@ -205,6 +215,7 @@ export default function AdminPlaces() {
     }
   };
 
+  // Filter attractions and restaurants
   const attractions = useMemo(
     () => filteredPlaces.filter((p) => p.category === "Attraction"),
     [filteredPlaces]
@@ -214,6 +225,7 @@ export default function AdminPlaces() {
     [filteredPlaces]
   );
 
+  // Render each place row (read or edit mode)
   const renderPlaceRow = (place) => (
     <li key={getId(place)} className="list-row">
       {editingPlace && getId(editingPlace) === getId(place) ? (
@@ -255,7 +267,7 @@ export default function AdminPlaces() {
             onChange={handleEditChange}
             placeholder="Image URL"
           />
-          <label style={{marginLeft: "8px"}}>
+          <label style={{ marginLeft: "8px" }}>
             <input
               name="is_active"
               type="checkbox"
@@ -289,7 +301,12 @@ export default function AdminPlaces() {
                   <span>
                     Image:{" "}
                     <a
-                      href={place.image}
+                      // If image is a full URL, use as is; if not, append API_BASE
+                      href={
+                        place.image.startsWith("http")
+                          ? place.image
+                          : API_BASE + place.image
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -329,7 +346,12 @@ export default function AdminPlaces() {
   );
 
   if (loading) return <div className="container">Loading…</div>;
-  if (err) return <div className="container" style={{ color: "crimson" }}>{err}</div>;
+  if (err)
+    return (
+      <div className="container" style={{ color: "crimson" }}>
+        {err}
+      </div>
+    );
 
   return (
     <div className="container">
@@ -367,7 +389,7 @@ export default function AdminPlaces() {
         </button>
       </div>
 
-      {/* Attractions */}
+      {/* Attractions section */}
       <div className="card" style={{ marginTop: "1rem" }}>
         <h3>Attractions</h3>
         <ul className="list">
@@ -376,7 +398,7 @@ export default function AdminPlaces() {
         </ul>
       </div>
 
-      {/* Restaurants */}
+      {/* Restaurants section */}
       <div className="card" style={{ marginTop: "1rem" }}>
         <h3>Restaurants</h3>
         <ul className="list">
