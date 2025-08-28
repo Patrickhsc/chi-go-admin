@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./AddPlace.css";
 // Import the adminAPI helper for consistent backend calls
-import { adminAPI } from "../api";
+import { adminAPI, uploadImage } from "./services/api"; 
 
 export default function AddPlace() {
   // State for form fields
