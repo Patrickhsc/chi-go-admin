@@ -1,20 +1,28 @@
 import React, { useState } from "react";
 import "./AddPlace.css";
-import { adminAPI } from "./services/api"; // ✅ 使用封装好的后端客户端
+// Import your API helper if you have one, or use fetch directly
+// import { adminAPI, uploadImage } from "./services/api"; 
+
+// You can modify this to match your backend API base URL if needed
+const API_BASE = ""; // e.g. "http://localhost:5000" or production base
 
 export default function AddPlace() {
+  // State for form fields
   const [form, setForm] = useState({
     category: "Attraction",
     name: "",
     description: "",
-    image: "",
+    image: "", // This will store the URL returned by backend after uploading
     location_lat: "",
     location_lng: "",
     location_address: "",
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  // Add this function
+  // State for submission and uploading status
+  const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  // Handle change for text input fields
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prevForm) => ({
@@ -23,13 +31,48 @@ export default function AddPlace() {
     }));
   };
 
+  // Handle file selection and upload to backend
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      // Prepare form data for file upload
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Send POST request to backend upload endpoint
+      const res = await fetch(API_BASE + "/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      // If upload is successful, set the returned URL to form.image
+      if (data.url) {
+        setForm((prevForm) => ({
+          ...prevForm,
+          image: data.url,
+        }));
+        alert("Image uploaded successfully!");
+      } else {
+        alert("Image upload failed.");
+      }
+    } catch (err) {
+      alert("Image upload failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
 
     try {
-      // 规范化/校验
+      // Validate latitude and longitude inputs
       const lat = parseFloat(form.location_lat);
       const lng = parseFloat(form.location_lng);
       if (Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -38,7 +81,7 @@ export default function AddPlace() {
         return;
       }
 
-      // 关键：location 做成对象，isActive 用驼峰
+      // Build payload structure for backend
       const payload = {
         name: form.name,
         description: form.description,
@@ -48,22 +91,36 @@ export default function AddPlace() {
           lng,
           address: form.location_address,
         },
-        isActive: true, // 注意字段名
+        isActive: true,
       };
 
-      console.log('提交的 payload:', payload);
-
-      // 按分类走不同的 admin 接口
+      // Choose API endpoint based on category
+      let apiEndpoint = "";
       if (form.category === "Attraction") {
-        await adminAPI.createAttraction(payload); // POST /admin/attractions
+        apiEndpoint = API_BASE + "/admin/attractions";
       } else if (form.category === "Restaurant") {
-        await adminAPI.createRestaurant(payload); // POST /admin/restaurants
+        apiEndpoint = API_BASE + "/admin/restaurants";
       } else {
         throw new Error("Unknown category: " + form.category);
       }
 
+      // Send POST request to backend to add the place
+      const res = await fetch(apiEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        credentials: "include", // If your backend needs auth cookies
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Add failed");
+      }
+
       alert("Place added successfully!");
-      // 清表单
+      // Reset form after successful submission
       setForm({
         category: "Attraction",
         name: "",
@@ -74,8 +131,7 @@ export default function AddPlace() {
         location_address: "",
       });
     } catch (err) {
-      console.error("Error adding place:", err?.response || err);
-      alert(err?.response?.data?.message || err.message || "Add failed");
+      alert(err?.message || "Add failed");
     } finally {
       setSubmitting(false);
     }
@@ -85,6 +141,7 @@ export default function AddPlace() {
     <div className="add-place-container">
       <h2 className="form-title">Admin · Add Attraction/Restaurant</h2>
       <form onSubmit={handleSubmit} className="card add-place-form">
+        {/* Category select */}
         <div className="form-group">
           <label>Category</label>
           <select
@@ -98,6 +155,7 @@ export default function AddPlace() {
           </select>
         </div>
 
+        {/* Name input */}
         <div className="form-group">
           <label>Name</label>
           <input
@@ -110,6 +168,7 @@ export default function AddPlace() {
           />
         </div>
 
+        {/* Description input */}
         <div className="form-group">
           <label>Description</label>
           <textarea
@@ -122,17 +181,33 @@ export default function AddPlace() {
           />
         </div>
 
+        {/* Image upload */}
         <div className="form-group">
-          <label>Image URL</label>
+          <label>Image</label>
           <input
-            name="image"
-            value={form.image}
-            onChange={handleChange}
-            placeholder="https://..."
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
             className="form-input"
+            disabled={uploading}
           />
+          {/* Show preview if image URL exists */}
+          {form.image && (
+            <div style={{ marginTop: 8 }}>
+              <img
+                src={
+                  form.image.startsWith("http") || form.image.startsWith("/")
+                    ? API_BASE + form.image
+                    : form.image
+                }
+                alt="Preview"
+                style={{ maxWidth: 180, maxHeight: 120 }}
+              />
+            </div>
+          )}
         </div>
 
+        {/* Latitude input */}
         <div className="form-group">
           <label>Latitude</label>
           <input
@@ -147,6 +222,7 @@ export default function AddPlace() {
           />
         </div>
 
+        {/* Longitude input */}
         <div className="form-group">
           <label>Longitude</label>
           <input
@@ -161,6 +237,7 @@ export default function AddPlace() {
           />
         </div>
 
+        {/* Address input */}
         <div className="form-group">
           <label>Address</label>
           <input
@@ -173,7 +250,8 @@ export default function AddPlace() {
           />
         </div>
 
-        <button type="submit" className="submit-btn" disabled={submitting}>
+        {/* Submit button */}
+        <button type="submit" className="submit-btn" disabled={submitting || uploading}>
           {submitting ? "Adding..." : "Add Place"}
         </button>
       </form>
