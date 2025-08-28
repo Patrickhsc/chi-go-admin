@@ -15,6 +15,8 @@ export default function AddPlace() {
     location_address: "",
   });
 
+  const API_BASE = process.env.REACT_APP_API_BASE || "";
+  
   // State for UI feedback
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -162,7 +164,11 @@ export default function AddPlace() {
           {form.image && (
             <div style={{ marginTop: 8 }}>
               <img
-                src={form.image}
+                src={
+                  form.image.startsWith("http")
+                    ? form.image
+                    : API_BASE + form.image
+                }
                 alt="Preview"
                 style={{ maxWidth: 180, maxHeight: 120 }}
               />
