@@ -1,34 +1,18 @@
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  attractionsAPI,
-  restaurantsAPI,
-  adminAPI,
-} from "./services/api";
+import { attractionsAPI, restaurantsAPI, adminAPI } from "./services/api";
 
 // Read backend API base URL from environment, fallback to empty string
 const API_BASE = process.env.REACT_APP_API_BASE || "";
 
-// Utility: Upload image file to backend, return the image URL
-async function uploadImageFile(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  // This endpoint should be implemented in your backend; it should return { url: "image URL" }
-  const resp = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
-  });
-  if (!resp.ok) throw new Error("Image upload failed");
-  const data = await resp.json();
-  return data.url;
-}
-
 export default function AdminPlaces() {
+  // States for places, filtering, editing, loading, error, and image uploading
   const [places, setPlaces] = useState([]);
   const [query, setQuery] = useState("");
   const [filteredPlaces, setFilteredPlaces] = useState([]);
   const [editingPlace, setEditingPlace] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [uploading, setUploading] = useState(false); // For image upload feedback
 
   // Helper to get id (supports both 'id' and '_id' fields)
   const getId = (p) => p?.id ?? p?._id;
@@ -121,7 +105,7 @@ export default function AdminPlaces() {
     });
   };
 
-  // Handle editing field changes
+  // Handle editing field changes (text, checkbox)
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingPlace((prev) => ({
@@ -135,6 +119,26 @@ export default function AdminPlaces() {
           ? checked
           : value,
     }));
+  };
+
+  // Handle image file upload (same logic as AddPlace)
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      // Use the adminAPI helper for uploading image
+      const url = await adminAPI.uploadImage(file);
+      setEditingPlace((prev) => ({
+        ...prev,
+        image: url,
+      }));
+      alert("Image uploaded successfully!");
+    } catch (err) {
+      alert("Image upload failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setUploading(false);
+    }
   };
 
   // Choose admin API endpoints based on place category
@@ -277,26 +281,13 @@ export default function AdminPlaces() {
             placeholder="Longitude"
           />
 
-          {/* Image upload input */}
+          {/* Image upload input, using the same logic as AddPlace */}
           <div style={{ margin: "6px 0" }}>
             <input
               type="file"
               accept="image/*"
-              onChange={async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                try {
-                  // 1. Upload file and get the image URL from backend
-                  const url = await uploadImageFile(file);
-                  // 2. Set the image URL into the editingPlace state
-                  setEditingPlace((prev) => ({
-                    ...prev,
-                    image: url,
-                  }));
-                } catch (err) {
-                  alert("Upload failed: " + (err.message || err));
-                }
-              }}
+              onChange={handleImageUpload}
+              disabled={uploading}
             />
           </div>
           {/* Show image preview if there is one */}
@@ -333,15 +324,17 @@ export default function AdminPlaces() {
             Active
           </label>
           <div style={{ display: "inline-flex", gap: 8, marginLeft: 8 }}>
-            <button type="submit">Save</button>
-            <button type="button" onClick={cancelEdit}>
+            <button type="submit" disabled={uploading}>
+              Save
+            </button>
+            <button type="button" onClick={cancelEdit} disabled={uploading}>
               Cancel
             </button>
           </div>
         </form>
       ) : (
+        // Display mode for place row
         <>
-          {/* Display mode for place row */}
           <div>
             <strong>{place.category}</strong> — {place.name}
             <div className="muted">
@@ -401,7 +394,8 @@ export default function AdminPlaces() {
     </li>
   );
 
-  if (loading) return <div className="container">Loading…</div>;
+  if (loading)
+    return <div className="container">Loading…</div>;
   if (err)
     return (
       <div className="container" style={{ color: "crimson" }}>
