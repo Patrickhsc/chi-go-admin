@@ -1,10 +1,7 @@
 import React, { useState } from "react";
 import "./AddPlace.css";
-// Import your API helper if you have one, or use fetch directly
-// import { adminAPI, uploadImage } from "./services/api"; 
-
-// You can modify this to match your backend API base URL if needed
-const API_BASE = ""; // e.g. "http://localhost:5000" or production base
+// Import the adminAPI helper for consistent backend calls
+import { adminAPI } from "../api";
 
 export default function AddPlace() {
   // State for form fields
@@ -12,21 +9,21 @@ export default function AddPlace() {
     category: "Attraction",
     name: "",
     description: "",
-    image: "", // This will store the URL returned by backend after uploading
+    image: "", // Will store backend-returned image URL
     location_lat: "",
     location_lng: "",
     location_address: "",
   });
 
-  // State for submission and uploading status
+  // State for UI feedback
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Handle change for text input fields
+  // Handle changes to text input fields
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prevForm) => ({
-      ...prevForm,
+    setForm((prev) => ({
+      ...prev,
       [name]: value,
     }));
   };
@@ -37,27 +34,13 @@ export default function AddPlace() {
     if (!file) return;
     setUploading(true);
     try {
-      // Prepare form data for file upload
-      const formData = new FormData();
-      formData.append("file", file);
-
-      // Send POST request to backend upload endpoint
-      const res = await fetch(API_BASE + "/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-
-      // If upload is successful, set the returned URL to form.image
-      if (data.url) {
-        setForm((prevForm) => ({
-          ...prevForm,
-          image: data.url,
-        }));
-        alert("Image uploaded successfully!");
-      } else {
-        alert("Image upload failed.");
-      }
+      // Use the unified API helper for image upload
+      const url = await adminAPI.uploadImage(file);
+      setForm((prev) => ({
+        ...prev,
+        image: url,
+      }));
+      alert("Image uploaded successfully!");
     } catch (err) {
       alert("Image upload failed: " + (err?.message || "Unknown error"));
     } finally {
@@ -65,14 +48,14 @@ export default function AddPlace() {
     }
   };
 
-  // Handle form submission
+  // Handle form submission to add a new place
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
 
     try {
-      // Validate latitude and longitude inputs
+      // Validate latitude and longitude
       const lat = parseFloat(form.location_lat);
       const lng = parseFloat(form.location_lng);
       if (Number.isNaN(lat) || Number.isNaN(lng)) {
@@ -81,7 +64,7 @@ export default function AddPlace() {
         return;
       }
 
-      // Build payload structure for backend
+      // Prepare payload for backend
       const payload = {
         name: form.name,
         description: form.description,
@@ -94,29 +77,13 @@ export default function AddPlace() {
         isActive: true,
       };
 
-      // Choose API endpoint based on category
-      let apiEndpoint = "";
+      // Choose correct API call based on category
       if (form.category === "Attraction") {
-        apiEndpoint = API_BASE + "/admin/attractions";
+        await adminAPI.createAttraction(payload);
       } else if (form.category === "Restaurant") {
-        apiEndpoint = API_BASE + "/admin/restaurants";
+        await adminAPI.createRestaurant(payload);
       } else {
         throw new Error("Unknown category: " + form.category);
-      }
-
-      // Send POST request to backend to add the place
-      const res = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-        credentials: "include", // If your backend needs auth cookies
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Add failed");
       }
 
       alert("Place added successfully!");
@@ -191,15 +158,11 @@ export default function AddPlace() {
             className="form-input"
             disabled={uploading}
           />
-          {/* Show preview if image URL exists */}
+          {/* Show preview if image URL is set */}
           {form.image && (
             <div style={{ marginTop: 8 }}>
               <img
-                src={
-                  form.image.startsWith("http") || form.image.startsWith("/")
-                    ? API_BASE + form.image
-                    : form.image
-                }
+                src={form.image}
                 alt="Preview"
                 style={{ maxWidth: 180, maxHeight: 120 }}
               />
