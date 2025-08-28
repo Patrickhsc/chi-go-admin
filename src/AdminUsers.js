@@ -98,12 +98,6 @@ export default function AdminUsers() {
                         required
                       />
                       <input
-                        name="avatar"
-                        value={editingUser.avatar || ""}
-                        onChange={handleEditChange}
-                        placeholder="Avatar URL"
-                      />
-                      <input
                         name="role"
                         value={editingUser.role || ""}
                         onChange={handleEditChange}
@@ -136,22 +130,6 @@ export default function AdminUsers() {
                       <br />
                       <strong>Active:</strong> {u.is_active ? "Yes" : "No"}
                       <br />
-                      {u.avatar && (
-                        <>
-                          <strong>Avatar:</strong>{" "}
-                          <img
-                            src={u.avatar}
-                            alt="avatar"
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: "50%",
-                              verticalAlign: "middle",
-                            }}
-                          />
-                          <br />
-                        </>
-                      )}
                     </>
                   )}
                 </div>
